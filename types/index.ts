@@ -17,6 +17,11 @@ export interface Activity {
   name: string
   timeOfDay: string
   description: string
+  location?: string
+  address?: string
+  durationMinutes?: number
+  bookingLink?: string
+  transportation?: string
   orderIndex?: number
 }
 

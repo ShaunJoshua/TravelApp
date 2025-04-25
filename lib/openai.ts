@@ -16,26 +16,31 @@ export async function generateItinerary(formData: ItineraryFormData): Promise<It
 
   // Create the prompt for OpenAI
   const prompt = `
-    Create a detailed travel itinerary for a trip to ${destination} starting on ${startDate} for ${duration} days. 
-    The traveler is interested in: ${preferencesText}.
-    
-    Include a day-by-day breakdown with the following details for each activity:
-    - Activity name
-    - Suggested time of day (Morning, Afternoon, Evening)
-    - Short description of the activity
-    
-    Ensure the itinerary includes a balance of exploration, relaxation, and cultural experiences.
-    
-    Format your response as a JSON object with the following structure:
+    Create a highly detailed travel itinerary for a trip to ${destination} starting on ${startDate} for ${duration} days.
+    The traveler preferences: ${preferencesText}.
+
+    For each day, provide:
+    - dayNumber
+    - activities: for each, include fields:
+      name, timeOfDay (Morning/Afternoon/Evening), description, location (place name), address, durationMinutes, bookingLink, transportation.
+
+    Ensure each activity is location-specific and actionable (with real or plausible booking links).
+
+    Respond only with valid JSON:
     {
       "days": [
         {
           "dayNumber": 1,
           "activities": [
             {
-              "name": "Activity name",
-              "timeOfDay": "Morning/Afternoon/Evening",
-              "description": "Brief description"
+              "name": "...",
+              "timeOfDay": "...",
+              "description": "...",
+              "location": "...",
+              "address": "...",
+              "durationMinutes": 90,
+              "bookingLink": "https://...",
+              "transportation": "..."
             }
           ]
         }
@@ -90,6 +95,11 @@ export async function generateItinerary(formData: ItineraryFormData): Promise<It
         name: activity.name,
         timeOfDay: activity.timeOfDay,
         description: activity.description,
+        location: activity.location,
+        address: activity.address,
+        durationMinutes: activity.durationMinutes,
+        bookingLink: activity.bookingLink,
+        transportation: activity.transportation,
         orderIndex: index,
       })),
     }))

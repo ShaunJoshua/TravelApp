@@ -137,8 +137,25 @@ export default function ItineraryDisplay({ itinerary, preferences = [] }: Itiner
                       </div>
                       <CardDescription className="text-sm">{activity.timeOfDay}</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-1">
                       <p className="text-sm">{activity.description}</p>
+                      {activity.location && (
+                        <p className="text-sm"><strong>Location:</strong> {activity.location}</p>
+                      )}
+                      {activity.address && (
+                        <p className="text-sm"><strong>Address:</strong> {activity.address}</p>
+                      )}
+                      {activity.durationMinutes && (
+                        <p className="text-sm"><strong>Duration:</strong> {activity.durationMinutes} mins</p>
+                      )}
+                      {activity.transportation && (
+                        <p className="text-sm"><strong>Transportation:</strong> {activity.transportation}</p>
+                      )}
+                      {activity.bookingLink && (
+                        <a href={activity.bookingLink} target="_blank" className="text-primary hover:underline">
+                          Book Now
+                        </a>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
