@@ -10,16 +10,24 @@ import { ArrowLeft } from "lucide-react"
 export default function ResultsPage() {
   const router = useRouter()
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
+  const [source, setSource] = useState<string>("unknown")
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     try {
       // Get the itinerary from localStorage
       const storedItinerary = localStorage.getItem("currentItinerary")
+      const storedSource = localStorage.getItem("itinerarySource")
 
       if (storedItinerary) {
         const parsedItinerary = JSON.parse(storedItinerary)
         setItinerary(parsedItinerary)
+        
+        // Set the source if available
+        if (storedSource) {
+          setSource(storedSource)
+        }
+        
       } else {
         // Redirect to home if no itinerary is found
         setError("No itinerary found. Please generate a new one.")
@@ -67,7 +75,7 @@ export default function ResultsPage() {
           Back to Planner
         </Button>
 
-        <ItineraryDisplay itinerary={itinerary} />
+        <ItineraryDisplay itinerary={itinerary} source={source} />
       </div>
     </div>
   )

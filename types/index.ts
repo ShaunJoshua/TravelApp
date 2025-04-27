@@ -22,6 +22,9 @@ export interface Activity {
   durationMinutes?: number
   bookingLink?: string
   transportation?: string
+  categories?: string
+  photoUrl?: string
+  localTip?: string
   orderIndex?: number
 }
 
@@ -38,7 +41,8 @@ export interface Itinerary {
   startDate: string
   duration: number
   days: Day[]
-  preferences: Preference[]
+  /** Selected preference IDs */
+  preferences: string[]
   userId?: string
   createdAt?: string
   updatedAt?: string

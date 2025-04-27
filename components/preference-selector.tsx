@@ -1,8 +1,7 @@
-"use client"
+      "use client"
 
 import React, { useEffect, useState } from "react"
 import type { Preference } from "@/types"
-import { getBrowserClient } from "@/lib/supabase"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
@@ -14,49 +13,40 @@ interface PreferenceSelectorProps {
 export default function PreferenceSelector({ selectedPreferences, onChange }: PreferenceSelectorProps) {
   const [preferences, setPreferences] = useState<Preference[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  
+  // Fixed emoji encoding with escaped sequences
   const DEFAULT_PREFERENCES: Preference[] = [
-    { id: "beach", name: "Beach", icon: "🏖️", description: "Beach" },
-    { id: "hiking", name: "Hiking", icon: "🥾", description: "Hiking" },
-    { id: "nightlife", name: "Nightlife", icon: "🌃", description: "Nightlife" },
-    { id: "museums", name: "Museums", icon: "🏛️", description: "Museums" },
-    { id: "food_wine", name: "Food & Wine", icon: "🍷", description: "Food & Wine" },
-    { id: "shopping", name: "Shopping", icon: "🛍️", description: "Shopping" },
-    { id: "wildlife", name: "Wildlife", icon: "🐾", description: "Wildlife" },
-    { id: "photography", name: "Photography", icon: "📷", description: "Photography" },
-    { id: "adventure_sports", name: "Adventure Sports", icon: "🏄", description: "Adventure Sports" },
-    { id: "historical_sites", name: "Historical Sites", icon: "🏰", description: "Historical Sites" },
-    { id: "local_culture", name: "Local Culture", icon: "🗺️", description: "Local Culture" },
-    { id: "relaxation", name: "Relaxation", icon: "🛀", description: "Relaxation" },
-    { id: "family_friendly", name: "Family Friendly", icon: "👪", description: "Family Friendly" },
-    { id: "romantic", name: "Romantic", icon: "❤️", description: "Romantic" },
-    { id: "budget_travel", name: "Budget Travel", icon: "💰", description: "Budget Travel" },
+    { id: "beach", name: "Beach", icon: "🏖️", description: "Beach vacations and coastal activities" },
+    { id: "hiking", name: "Hiking", icon: "🥾", description: "Hiking trails and outdoor adventures" },
+    { id: "nightlife", name: "Nightlife", icon: "🌃", description: "Bars, clubs and evening entertainment" },
+    { id: "museums", name: "Museums", icon: "🏛️", description: "Museums and art galleries" },
+    { id: "food_wine", name: "Food & Wine", icon: "🍷", description: "Culinary experiences and wine tasting" },
+    { id: "shopping", name: "Shopping", icon: "🛍️", description: "Shopping districts and markets" },
+    { id: "wildlife", name: "Wildlife", icon: "🦁", description: "Animal watching and wildlife reserves" },
+    { id: "photography", name: "Photography", icon: "📷", description: "Scenic spots perfect for photos" },
+    { id: "adventure", name: "Adventure", icon: "🧗", description: "Thrilling and adventurous activities" },
+    { id: "history", name: "History", icon: "🏰", description: "Historical sites and landmarks" },
+    { id: "culture", name: "Culture", icon: "🎭", description: "Local traditions and cultural experiences" },
+    { id: "relaxation", name: "Relaxation", icon: "🧘", description: "Spas and wellness retreats" },
+    { id: "family", name: "Family", icon: "👨‍👩‍👧‍👦", description: "Family-friendly activities" },
+    { id: "romantic", name: "Romantic", icon: "❤️", description: "Perfect for couples" },
+    { id: "budget", name: "Budget", icon: "💰", description: "Affordable travel options" }
   ]
+  
+  // Set preferences immediately on component load
+  useEffect(() => {
+    setPreferences(DEFAULT_PREFERENCES)
+    setIsLoading(false)
+  }, [])
+  
   const [searchTerm, setSearchTerm] = useState<string>("")
+  
+  // Filter preferences based on search term
   const filteredPreferences = preferences.filter((pref: Preference) =>
     pref.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  useEffect(() => {
-    async function fetchPreferences() {
-      try {
-        const supabase = getBrowserClient()
-        const { data, error } = await supabase.from("preferences").select("*").order("name")
-
-        if (error) {
-          throw error
-        }
-
-        setPreferences([...(data || []), ...DEFAULT_PREFERENCES.filter((dp: Preference) => !(data || []).some((d: Preference) => d.id === dp.id))])
-      } catch (error) {
-        console.error("Error fetching preferences:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchPreferences()
-  }, [])
-
+  // Toggle a preference selection
   const togglePreference = (id: string) => {
     if (selectedPreferences.includes(id)) {
       onChange(selectedPreferences.filter((prefId) => prefId !== id))
@@ -65,6 +55,7 @@ export default function PreferenceSelector({ selectedPreferences, onChange }: Pr
     }
   }
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-pulse">
@@ -87,7 +78,7 @@ export default function PreferenceSelector({ selectedPreferences, onChange }: Pr
         />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {filteredPreferences.map((preference: Preference) => (
+        {preferences.map((preference: Preference) => (
           <button
             key={preference.id}
             type="button"

@@ -14,9 +14,10 @@ import { useToast } from "@/hooks/use-toast"
 interface ItineraryDisplayProps {
   itinerary: Itinerary
   preferences?: Preference[]
+  source?: string
 }
 
-export default function ItineraryDisplay({ itinerary, preferences = [] }: ItineraryDisplayProps) {
+export default function ItineraryDisplay({ itinerary, preferences = [], source = "unknown" }: ItineraryDisplayProps) {
   const { toast } = useToast()
   const [email, setEmail] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -96,6 +97,21 @@ export default function ItineraryDisplay({ itinerary, preferences = [] }: Itiner
           <CardTitle className="text-2xl">Your Trip to {itinerary.destination}</CardTitle>
           <CardDescription>
             {format(parseISO(itinerary.startDate), "MMMM d, yyyy")} - {itinerary.duration} days
+            <div className="mt-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                source === "openrouter" 
+                  ? "bg-green-100 text-green-800" 
+                  : source === "openai" 
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}>
+                {source === "openrouter" 
+                  ? "AI Generated (DeepSeek)" 
+                  : source === "openai" 
+                  ? "AI Generated (OpenAI)"
+                  : "Mock Data"}
+              </span>
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -128,31 +144,57 @@ export default function ItineraryDisplay({ itinerary, preferences = [] }: Itiner
 
                 {day.activities.map((activity, index) => (
                   <Card key={index} className="overflow-hidden">
-                    <CardHeader className="pb-2">
+                    <CardHeader className="pb-2 bg-gray-50">
                       <div className="flex items-center">
                         <span className="text-xl mr-2">
                           {getPreferenceEmoji(activity.name) || getTimeEmoji(activity.timeOfDay)}
                         </span>
-                        <CardTitle className="text-base">{activity.name}</CardTitle>
+                        <CardTitle className="text-lg font-semibold">{activity.name}</CardTitle>
                       </div>
                       <CardDescription className="text-sm">{activity.timeOfDay}</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-1">
-                      <p className="text-sm">{activity.description}</p>
-                      {activity.location && (
-                        <p className="text-sm"><strong>Location:</strong> {activity.location}</p>
+                    <CardContent className="space-y-3 pt-4">
+                      {activity.photoUrl && (
+                        <div className="relative w-full h-48 overflow-hidden rounded-md mb-4">
+                          <img 
+                            src={activity.photoUrl} 
+                            alt={activity.name} 
+                            className="w-full h-full object-cover transition-all hover:scale-105"
+                            onError={(e) => {
+                              // Replace broken images with a placeholder
+                              e.currentTarget.src = `https://placehold.co/600x400/eee/999?text=${encodeURIComponent(activity.name)}`;
+                            }}
+                            loading="lazy"
+                          />
+                        </div>
                       )}
-                      {activity.address && (
-                        <p className="text-sm"><strong>Address:</strong> {activity.address}</p>
-                      )}
-                      {activity.durationMinutes && (
-                        <p className="text-sm"><strong>Duration:</strong> {activity.durationMinutes} mins</p>
-                      )}
-                      {activity.transportation && (
-                        <p className="text-sm"><strong>Transportation:</strong> {activity.transportation}</p>
-                      )}
+                      <p className="text-sm leading-relaxed">{activity.description}</p>
+                      <div className="space-y-2 mt-2">
+                        {activity.location && (
+                          <p className="text-sm"><strong>Location:</strong> {activity.location}</p>
+                        )}
+                        {activity.categories && (
+                          <p className="text-sm"><strong>Type:</strong> {activity.categories}</p>
+                        )}
+                        {activity.address && (
+                          <p className="text-sm"><strong>Address:</strong> {activity.address}</p>
+                        )}
+                        {activity.durationMinutes && (
+                          <p className="text-sm"><strong>Duration:</strong> {activity.durationMinutes} mins</p>
+                        )}
+                        {activity.transportation && (
+                          <p className="text-sm"><strong>Transportation:</strong> {activity.transportation}</p>
+                        )}
+                        {activity.localTip && (
+                          <p className="text-sm text-amber-700 bg-amber-50 p-2 rounded-md mt-2"><strong>Local Tip:</strong> {activity.localTip}</p>
+                        )}
+                      </div>
                       {activity.bookingLink && (
-                        <a href={activity.bookingLink} target="_blank" className="text-primary hover:underline">
+                        <a 
+                          href={activity.bookingLink} 
+                          target="_blank" 
+                          className="mt-3 inline-block bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                        >
                           Book Now
                         </a>
                       )}

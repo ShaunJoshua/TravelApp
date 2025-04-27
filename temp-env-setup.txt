@@ -1,0 +1,21 @@
+# Hugging Face API Setup Instructions
+
+To make your AI-generated itineraries work, you need to:
+
+1. Create a file named '.env.local' in the root of your project (d:\TravelApp-main\.env.local)
+2. Add the following line to this file:
+
+HF_API_KEY=your_huggingface_api_key_here
+
+3. Replace 'your_huggingface_api_key_here' with your actual Hugging Face API key
+
+## How to get a Hugging Face API key:
+
+1. Go to https://huggingface.co/
+2. Sign up for an account (or sign in if you already have one)
+3. Go to your profile settings
+4. Navigate to "Access Tokens"
+5. Create a new token with "read" permissions
+6. Copy the token and use it in your .env.local file
+
+After setting up your API key, restart the application for it to take effect.

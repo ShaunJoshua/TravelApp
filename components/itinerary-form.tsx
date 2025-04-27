@@ -94,6 +94,7 @@ export default function ItineraryForm() {
       }
 
       console.log("Itinerary generated successfully")
+      console.log("Data source:", data.source || "unknown")
 
       // Store the generated itinerary in localStorage for now
       localStorage.setItem(
@@ -103,6 +104,9 @@ export default function ItineraryForm() {
           preferences: formData.preferences,
         }),
       )
+      
+      // Store the source information
+      localStorage.setItem("itinerarySource", data.source || "mock")
 
       // Redirect to the results page
       router.push("/results")
