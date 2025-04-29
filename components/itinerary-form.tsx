@@ -74,9 +74,10 @@ export default function ItineraryForm() {
 
       // Check if the response is ok before trying to parse JSON
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("API error response:", errorText)
-        throw new Error(`Server error: ${response.status} ${response.statusText}`)
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.details || errorData?.error || response.statusText
+        console.error("API error response:", errorData)
+        throw new Error(`Server error: ${errorMessage}`)
       }
 
       // Now safely parse the JSON
@@ -95,6 +96,7 @@ export default function ItineraryForm() {
 
       console.log("Itinerary generated successfully")
       console.log("Data source:", data.source || "unknown")
+      console.log("Status:", data.status || "unknown")
 
       // Store the generated itinerary in localStorage for now
       localStorage.setItem(
@@ -107,12 +109,13 @@ export default function ItineraryForm() {
       
       // Store the source information
       localStorage.setItem("itinerarySource", data.source || "mock")
+      localStorage.setItem("itineraryStatus", data.status || "unknown")
 
       // Redirect to the results page
       router.push("/results")
-    } catch (err: any) {
-      console.error("Error generating itinerary:", err)
-      setError(err.message || "Failed to generate itinerary. Please try again.")
+    } catch (error) {
+      console.error("Error generating itinerary:", error)
+      setError(error instanceof Error ? error.message : "An unexpected error occurred")
     } finally {
       setIsLoading(false)
     }
@@ -168,10 +171,13 @@ export default function ItineraryForm() {
 
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (
-          <>
+          <div className="flex items-center justify-center">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Generating your itinerary...
-          </>
+            <div className="flex flex-col items-start">
+              <span>Generating your itinerary...</span>
+              <span className="text-xs text-muted-foreground">This may take a few moments</span>
+            </div>
+          </div>
         ) : (
           "Generate Itinerary"
         )}

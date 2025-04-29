@@ -2,13 +2,11 @@
  * Library exports
  */
 
-// Re-export from api-helpers
-export { 
-  fetchPlaceInfo, 
-  fetchWikiSummary, 
-  fetchUnsplashPhoto, 
-  fetchFoursquareDetails 
-} from './api-helpers';
+// Export from huggingface
+export { generateOpenRouterItinerary } from './huggingface';
 
-// Re-export from mock-itinerary
+// Export from mock-itinerary
 export { generateMockItinerary } from './mock-itinerary';
+
+// Export from supabase
+export { getServerClient } from './supabase';

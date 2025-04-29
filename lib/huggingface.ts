@@ -1,11 +1,9 @@
 import type { Day, Itinerary, ItineraryFormData } from "@/types"
 import { addDays, format } from "date-fns"
-import { fetchPlaceInfo, fetchWikiSummary, fetchUnsplashPhoto, fetchFoursquareDetails } from "."
 import { generateMockItinerary } from "./mock-itinerary"
-import { fetchLocalAttractions } from "@/lib/api-helpers";
 
 // Use user-provided default OpenRouter key if process.env not set
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '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';
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
 /**
  * Generate a travel itinerary using OpenRouter R1T Chimera model
@@ -15,27 +13,45 @@ export async function generateOpenRouterItinerary(formData: ItineraryFormData): 
   const { destination, startDate, duration, preferences } = formData
   const startDateObj = new Date(startDate)
 
-  try {
-    // Ground the itinerary with real popular attractions
-    let attractionsListText = "";
-    try {
-      const topPlaces = await fetchLocalAttractions(destination);
-      attractionsListText = topPlaces.map((p: any) => p.name).slice(0, 10).join(", ");
-      console.log("Popular attractions for grounding:", attractionsListText);
-    } catch (err) {
-      console.error("Error fetching local attractions for grounding:", err);
-    }
+  // Validate API key first
+  if (!OPENROUTER_KEY) {
+    console.error("No valid OpenRouter API key found. Using mock data instead.");
+    return generateMockItinerary(formData);
+  }
 
+  try {
     // Create a detailed prompt for the Mixtral model
     const prompt = `<s>[INST] You are a local travel expert in ${destination} who specializes in highly personalized itineraries.
     
-Here is a list of popular attractions you should use when planning: ${attractionsListText}. Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}. For each activity, include the following fields in the JSON:
-- name: The real venue name,
-- timeOfDay: Morning, Afternoon, or Evening,
-- description: A brief 2-3 sentence description of the activity,
-- location: The venue address,
-- categories: The type of venue (e.g., museum, park, restaurant),
-- photoUrl: A representative image URL if available.
+Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}. 
+
+IMPORTANT: You must respond with a valid JSON object that follows this exact structure:
+{
+  "days": [
+    {
+      "day": 1,
+      "date": "${format(startDateObj, "yyyy-MM-dd")}",
+      "activities": [
+        {
+          "name": "Activity Name",
+          "timeOfDay": "Morning/Afternoon/Evening",
+          "description": "2-3 sentence description",
+          "location": "Venue address",
+          "categories": "Type of venue (e.g., museum, park, restaurant)",
+          "imageUrl": "A direct link to a relevant image for this place or activity (MUST be a real image ending in .jpg, .jpeg, .png, or .webp from Unsplash, Wikimedia, or the official site; DO NOT use SVGs, icons, or indirect links)"
+        }
+      ]
+    }
+  ]
+}
+
+For each activity, include the following fields:
+- name: The real venue name
+- timeOfDay: Morning, Afternoon, or Evening
+- description: A brief 2-3 sentence description of the activity
+- location: The venue address
+- categories: The type of venue (e.g., museum, park, restaurant)
+- imageUrl: A direct link to a relevant image for this place or activity (MUST be a real image ending in .jpg, .jpeg, .png, or .webp from Unsplash, Wikimedia, or the official site; DO NOT use SVGs, icons, or indirect links.
 
 Ensure all venues are real and relevant to ${destination}.
 
@@ -45,8 +61,9 @@ IMPORTANT INSTRUCTIONS:
 3. Activities should be diverse across the trip
 4. BALANCE the day with a mix of preferences
 5. Base your selections ENTIRELY on the given interests
+6. RESPOND ONLY WITH THE JSON OBJECT, NO OTHER TEXT
+7. For imageUrl, only use direct links to real images from Unsplash, Wikimedia, or the official site, ending in .jpg, .jpeg, .png, or .webp. Do not use SVGs, icons, or indirect links.
 
-Respond ONLY with the final JSON itinerary object, and nothing else.
 [/INST]</s>`
 
     // Print API configuration information
@@ -55,12 +72,6 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
     console.log("Duration:", duration);
     console.log("OpenRouter key in use:", OPENROUTER_KEY !== undefined);
     console.log("=== END CONFIGURATION ===");
-
-    // Check if API key is available
-    if (!OPENROUTER_KEY || OPENROUTER_KEY === 'hf_dummy_key_for_testing') {
-      console.error("No valid OpenRouter API key found. Using mock data instead.");
-      return generateMockItinerary(formData);
-    }
 
     // Call OpenRouter API with Mixtral 8x7B model
     console.log("Calling OpenRouter API with prompt length:", prompt.length);
@@ -90,10 +101,17 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
     );
 
     if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
       console.error(`OpenRouter API Error: Status ${response.status} - ${response.statusText}`);
-      const errorText = await response.text();
-      console.error("Error details:", errorText);
-      throw new Error(`OpenRouter API error: ${response.statusText}`);
+      console.error("Error details:", errorData);
+      
+      if (response.status === 401) {
+        throw new Error("Invalid OpenRouter API key. Please check your credentials.");
+      } else if (response.status === 429) {
+        throw new Error("OpenRouter API rate limit exceeded. Please try again later.");
+      } else {
+        throw new Error(`OpenRouter API error: ${errorData?.error?.message || response.statusText}`);
+      }
     }
 
     console.log("Received response from OpenRouter API!");
@@ -115,7 +133,7 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
 
     if (!result || !content) {
       console.error("Invalid response format from OpenRouter API:", JSON.stringify(result).substring(0, 200));
-      throw new Error("Invalid response format from OpenRouter API");
+      throw new Error("Invalid response format from OpenRouter API: Missing content in response");
     }
     
     console.log("Successfully parsed response from OpenRouter API!");
@@ -149,8 +167,26 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
     try {
       parsedResponse = JSON.parse(jsonText);
     } catch (err) {
-      console.error("Error parsing OpenRouter JSON string:", jsonText);
-      throw err;
+      console.error("Error parsing OpenRouter JSON string (first attempt):", jsonText);
+      // Try to salvage by trimming to the last closing brace
+      const lastBrace = jsonText.lastIndexOf('}');
+      if (lastBrace !== -1) {
+        const salvaged = jsonText.substring(0, lastBrace + 1);
+        try {
+          parsedResponse = JSON.parse(salvaged);
+          console.warn("Salvaged OpenRouter JSON by trimming to last brace.");
+        } catch (err2) {
+          console.error("Failed to salvage OpenRouter JSON:", salvaged);
+          throw new Error(`Failed to parse OpenRouter response as JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
+      } else {
+        throw new Error(`Failed to parse OpenRouter response as JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    }
+
+    // Validate response structure
+    if (!parsedResponse || typeof parsedResponse !== 'object') {
+      throw new Error("Invalid response structure: Response is not an object");
     }
 
     // Support both 'days' and legacy 'itinerary' keys
@@ -158,8 +194,13 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
       if (Array.isArray(parsedResponse.itinerary)) {
         parsedResponse.days = parsedResponse.itinerary;
       } else {
-        throw new Error("Invalid response structure: missing 'days' or 'itinerary'");
+        throw new Error("Invalid response structure: missing 'days' or 'itinerary' array");
       }
+    }
+
+    // Validate days array
+    if (!Array.isArray(parsedResponse.days) || parsedResponse.days.length === 0) {
+      throw new Error("Invalid response structure: 'days' array is empty or invalid");
     }
 
     // Parse and enhance the itinerary with details
@@ -171,16 +212,25 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
       const dayNumber = day.day || day.dayNumber || (parsedResponse.days.indexOf(day) + 1);
       const date = day.date || format(addDays(startDateObj, dayNumber - 1), "yyyy-MM-dd");
       
-      const activitiesPromises = day.activities.map(async (act: any, idx: number) => {
-        // Use model-provided details if available
-        if (act.description && act.location) {
-          return { ...act, orderIndex: idx };
+      // Validate and fix imageUrl for each activity
+      const activities = await Promise.all(day.activities.map(async (act: any, idx: number) => {
+        let imageUrl = act.imageUrl || '';
+        // Only accept links that are http(s) and end with .jpg, .jpeg, .png, .webp and are from trusted sources
+        const isValid = imageUrl &&
+          imageUrl.startsWith('http') &&
+          /\.(jpg|jpeg|png|webp)$/i.test(imageUrl) &&
+          (imageUrl.includes('unsplash.com') || imageUrl.includes('wikimedia.org') || imageUrl.includes('wikipedia.org') || imageUrl.includes(destination.toLowerCase().replace(/\s+/g, '')));
+        if (!isValid) {
+          // Fallback to Unsplash
+          imageUrl = await fetchUnsplashPhoto(`${act.name} ${destination}`);
         }
-        // Fallback to enrichment
-        return enhanceActivity(act.name, act.timeOfDay, destination, idx, preferences);
-      });
+        return {
+          ...act,
+          imageUrl,
+          orderIndex: idx
+        };
+      }));
       
-      const activities = await Promise.all(activitiesPromises);
       days.push({ dayNumber, date, activities });
     }
 
@@ -204,11 +254,9 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
 // Enhance an activity with location-specific details from multiple sources
 async function enhanceActivity(name: string, timeOfDay: string, destination: string, idx: number, preferences: string[]): Promise<any> {
   try {
-    // Get place info from OpenStreetMap
-    const place = await fetchPlaceInfo(`${name} ${destination}`);
-    
-    // Get information from Wikipedia
-    let summary = await fetchWikiSummary(name);
+    // Place info and summary fetching are not implemented, so use fallbacks
+    const place = {};
+    let summary = "";
     
     // Customize description based on timeOfDay and venue type
     let enhancedDescription = summary;
@@ -260,7 +308,7 @@ async function enhanceActivity(name: string, timeOfDay: string, destination: str
       timeOfDay,
       description: enhancedDescription,
       location: name,
-      address: place.address || `${destination}`,
+      address: `${destination}`,
       durationMinutes: Math.floor(Math.random() * 60) + 90, // 90-150 mins
       bookingLink,
       transportation,
@@ -308,4 +356,21 @@ function inferCategory(name: string, preferences: string[]): string {
   }
   
   return 'Attraction';
+}
+
+// Add this helper function at the top-level (outside of other functions)
+async function fetchUnsplashPhoto(query: string): Promise<string> {
+  const accessKey = process.env.UNSPLASH_ACCESS_KEY;
+  if (!accessKey) return '';
+  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${accessKey}&per_page=1`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.results && data.results.length > 0) {
+      return data.results[0].urls.regular;
+    }
+  } catch (e) {
+    console.error('Unsplash fetch error', e);
+  }
+  return '';
 }

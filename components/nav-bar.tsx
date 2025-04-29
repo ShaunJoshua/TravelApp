@@ -3,8 +3,10 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { MapPin, List, Home } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { ThemeToggle } from "./theme-toggle"
 
-export default function NavBar() {
+export function NavBar() {
   const pathname = usePathname()
 
   const isActive = (path: string) => {
@@ -44,6 +46,10 @@ export default function NavBar() {
               My Trips
             </Link>
           </nav>
+
+          <div className="flex items-center space-x-4">
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>

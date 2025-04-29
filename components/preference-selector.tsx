@@ -69,7 +69,7 @@ export default function PreferenceSelector({ selectedPreferences, onChange }: Pr
   return (
     <div>
       <div className="mb-4">
-        <Label htmlFor="preference-search">Search interests</Label>
+        <Label htmlFor="preference-search" className="text-foreground">Search interests</Label>
         <Input
           id="preference-search"
           placeholder="e.g., beach, food"
@@ -83,10 +83,10 @@ export default function PreferenceSelector({ selectedPreferences, onChange }: Pr
             key={preference.id}
             type="button"
             onClick={() => togglePreference(preference.id)}
-            className={`flex items-center p-3 rounded-lg border transition-colors ${
+            className={`flex items-center p-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
               selectedPreferences.includes(preference.id)
-                ? "bg-primary/10 border-primary text-primary"
-                : "bg-white border-gray-200 hover:bg-gray-50"
+                ? "bg-primary/10 border-primary text-primary dark:bg-primary/20 dark:text-primary"
+                : "bg-card border-border text-foreground hover:bg-accent/30 dark:hover:bg-accent/40"
             }`}
           >
             <span className="text-2xl mr-2">{preference.icon}</span>

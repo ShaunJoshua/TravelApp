@@ -154,20 +154,22 @@ export default function ItineraryDisplay({ itinerary, preferences = [], source =
                       <CardDescription className="text-sm">{activity.timeOfDay}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 pt-4">
-                      {activity.photoUrl && (
-                        <div className="relative w-full h-48 overflow-hidden rounded-md mb-4">
-                          <img 
-                            src={activity.photoUrl} 
-                            alt={activity.name} 
-                            className="w-full h-full object-cover transition-all hover:scale-105"
-                            onError={(e) => {
-                              // Replace broken images with a placeholder
-                              e.currentTarget.src = `https://placehold.co/600x400/eee/999?text=${encodeURIComponent(activity.name)}`;
-                            }}
-                            loading="lazy"
-                          />
-                        </div>
-                      )}
+                      <div className="relative w-full h-48 overflow-hidden rounded-md mb-4">
+                        <img
+                          src={
+                            activity.imageUrl && activity.imageUrl.startsWith('http') && !activity.imageUrl.endsWith('.svg')
+                              ? activity.imageUrl
+                              : `https://source.unsplash.com/600x400/?${encodeURIComponent(activity.name)},${encodeURIComponent(itinerary.destination)}`
+                          }
+                          alt={activity.name}
+                          className="w-full h-full object-cover transition-all hover:scale-105"
+                          onError={(e) => {
+                            // Replace broken images with a placeholder
+                            e.currentTarget.src = `https://placehold.co/600x400/eee/999?text=${encodeURIComponent(activity.name)}`;
+                          }}
+                          loading="lazy"
+                        />
+                      </div>
                       <p className="text-sm leading-relaxed">{activity.description}</p>
                       <div className="space-y-2 mt-2">
                         {activity.location && (
