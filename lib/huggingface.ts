@@ -29,13 +29,33 @@ export async function generateOpenRouterItinerary(formData: ItineraryFormData): 
     // Create a detailed prompt for the Mixtral model
     const prompt = `<s>[INST] You are a local travel expert in ${destination} who specializes in highly personalized itineraries.
     
-Here is a list of popular attractions you should use when planning: ${attractionsListText}. Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}. For each activity, include the following fields in the JSON:
-- name: The real venue name,
-- timeOfDay: Morning, Afternoon, or Evening,
-- description: A brief 2-3 sentence description of the activity,
-- location: The venue address,
-- categories: The type of venue (e.g., museum, park, restaurant),
-- photoUrl: A representative image URL if available.
+Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}. 
+
+IMPORTANT: You must respond with a valid JSON object that follows this exact structure:
+{
+  "days": [
+    {
+      "day": 1,
+      "date": "${format(startDateObj, "yyyy-MM-dd")}",
+      "activities": [
+        {
+          "name": "Activity Name",
+          "timeOfDay": "Morning/Afternoon/Evening",
+          "description": "2-3 sentence description",
+          "location": "Venue address",
+          "categories": "Type of venue (e.g., museum, park, restaurant)"
+        }
+      ]
+    }
+  ]
+}
+
+For each activity, include the following fields:
+- name: The real venue name
+- timeOfDay: Morning, Afternoon, or Evening
+- description: A brief 2-3 sentence description of the activity
+- location: The venue address
+- categories: The type of venue (e.g., museum, park, restaurant)
 
 Ensure all venues are real and relevant to ${destination}.
 
@@ -45,8 +65,8 @@ IMPORTANT INSTRUCTIONS:
 3. Activities should be diverse across the trip
 4. BALANCE the day with a mix of preferences
 5. Base your selections ENTIRELY on the given interests
+6. RESPOND ONLY WITH THE JSON OBJECT, NO OTHER TEXT
 
-Respond ONLY with the final JSON itinerary object, and nothing else.
 [/INST]</s>`
 
     // Print API configuration information
@@ -115,7 +135,7 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
 
     if (!result || !content) {
       console.error("Invalid response format from OpenRouter API:", JSON.stringify(result).substring(0, 200));
-      throw new Error("Invalid response format from OpenRouter API");
+      throw new Error("Invalid response format from OpenRouter API: Missing content in response");
     }
     
     console.log("Successfully parsed response from OpenRouter API!");
@@ -150,7 +170,12 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
       parsedResponse = JSON.parse(jsonText);
     } catch (err) {
       console.error("Error parsing OpenRouter JSON string:", jsonText);
-      throw err;
+      throw new Error(`Failed to parse OpenRouter response as JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+
+    // Validate response structure
+    if (!parsedResponse || typeof parsedResponse !== 'object') {
+      throw new Error("Invalid response structure: Response is not an object");
     }
 
     // Support both 'days' and legacy 'itinerary' keys
@@ -158,8 +183,13 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
       if (Array.isArray(parsedResponse.itinerary)) {
         parsedResponse.days = parsedResponse.itinerary;
       } else {
-        throw new Error("Invalid response structure: missing 'days' or 'itinerary'");
+        throw new Error("Invalid response structure: missing 'days' or 'itinerary' array");
       }
+    }
+
+    // Validate days array
+    if (!Array.isArray(parsedResponse.days) || parsedResponse.days.length === 0) {
+      throw new Error("Invalid response structure: 'days' array is empty or invalid");
     }
 
     // Parse and enhance the itinerary with details
@@ -171,16 +201,11 @@ Respond ONLY with the final JSON itinerary object, and nothing else.
       const dayNumber = day.day || day.dayNumber || (parsedResponse.days.indexOf(day) + 1);
       const date = day.date || format(addDays(startDateObj, dayNumber - 1), "yyyy-MM-dd");
       
-      const activitiesPromises = day.activities.map(async (act: any, idx: number) => {
-        // Use model-provided details if available
-        if (act.description && act.location) {
-          return { ...act, orderIndex: idx };
-        }
-        // Fallback to enrichment
-        return enhanceActivity(act.name, act.timeOfDay, destination, idx, preferences);
-      });
+      const activities = day.activities.map((act: any, idx: number) => ({
+        ...act,
+        orderIndex: idx
+      }));
       
-      const activities = await Promise.all(activitiesPromises);
       days.push({ dayNumber, date, activities });
     }
 
