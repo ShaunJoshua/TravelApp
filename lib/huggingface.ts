@@ -1,6 +1,7 @@
 import type { Day, Itinerary, ItineraryFormData } from "@/types"
 import { addDays, format } from "date-fns"
 import { generateMockItinerary } from "./mock-itinerary"
+import fetch from 'node-fetch';
 
 // Use user-provided default OpenRouter key if process.env not set
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
@@ -23,7 +24,7 @@ export async function generateOpenRouterItinerary(formData: ItineraryFormData): 
     // Create a detailed prompt for the Mixtral model
     const prompt = `<s>[INST] You are a local travel expert in ${destination} who specializes in highly personalized itineraries.
     
-Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}. 
+Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}.
 
 IMPORTANT: You must respond with a valid JSON object that follows this exact structure:
 {
@@ -37,32 +38,17 @@ IMPORTANT: You must respond with a valid JSON object that follows this exact str
           "timeOfDay": "Morning/Afternoon/Evening",
           "description": "2-3 sentence description",
           "location": "Venue address",
-          "categories": "Type of venue (e.g., museum, park, restaurant)",
-          "imageUrl": "A direct link to a relevant image for this place or activity (MUST be a real image ending in .jpg, .jpeg, .png, or .webp from Unsplash, Wikimedia, or the official site; DO NOT use SVGs, icons, or indirect links)"
+          "categories": "Type of venue (e.g., museum, park, restaurant)"
         }
       ]
     }
   ]
 }
 
-For each activity, include the following fields:
-- name: The real venue name
-- timeOfDay: Morning, Afternoon, or Evening
-- description: A brief 2-3 sentence description of the activity
-- location: The venue address
-- categories: The type of venue (e.g., museum, park, restaurant)
-- imageUrl: A direct link to a relevant image for this place or activity (MUST be a real image ending in .jpg, .jpeg, .png, or .webp from Unsplash, Wikimedia, or the official site; DO NOT use SVGs, icons, or indirect links.
-
-Ensure all venues are real and relevant to ${destination}.
-
-IMPORTANT INSTRUCTIONS:
-1. DIRECTLY MATCH activities to the user's stated interests
-2. Include ONLY real, specific venues and attractions in ${destination}
-3. Activities should be diverse across the trip
-4. BALANCE the day with a mix of preferences
-5. Base your selections ENTIRELY on the given interests
-6. RESPOND ONLY WITH THE JSON OBJECT, NO OTHER TEXT
-7. For imageUrl, only use direct links to real images from Unsplash, Wikimedia, or the official site, ending in .jpg, .jpeg, .png, or .webp. Do not use SVGs, icons, or indirect links.
+STRICT INSTRUCTIONS:
+- Respond ONLY with the JSON object, no other text, no reasoning, no comments, no markdown.
+- Do NOT include any explanation, reasoning, or text outside the JSON object.
+- If you cannot comply, respond with an empty JSON object: {}.
 
 [/INST]</s>`
 
@@ -128,9 +114,21 @@ IMPORTANT INSTRUCTIONS:
     console.log("Parsed OpenRouter result:", JSON.stringify(parsedResult).substring(0, 500));
     
     // Extract generated text
-    const content = parsedResult.choices?.[0]?.message?.content;
-    console.log("OpenRouter generated text:", content);
-
+    let content = parsedResult.choices?.[0]?.message?.content;
+    let reasoning = parsedResult.choices?.[0]?.message?.reasoning;
+    console.log("OpenRouter generated text (content):", content);
+    if ((!result || !content) && reasoning) {
+      // Try to parse reasoning as JSON
+      console.log("OpenRouter generated text (reasoning):", reasoning);
+      try {
+        const possibleJson = reasoning.match(/\{[\s\S]*\}/);
+        if (possibleJson) {
+          content = possibleJson[0];
+        }
+      } catch (e) {
+        console.error("Failed to extract JSON from reasoning field", e);
+      }
+    }
     if (!result || !content) {
       console.error("Invalid response format from OpenRouter API:", JSON.stringify(result).substring(0, 200));
       throw new Error("Invalid response format from OpenRouter API: Missing content in response");
@@ -212,23 +210,10 @@ IMPORTANT INSTRUCTIONS:
       const dayNumber = day.day || day.dayNumber || (parsedResponse.days.indexOf(day) + 1);
       const date = day.date || format(addDays(startDateObj, dayNumber - 1), "yyyy-MM-dd");
       
-      // Validate and fix imageUrl for each activity
-      const activities = await Promise.all(day.activities.map(async (act: any, idx: number) => {
-        let imageUrl = act.imageUrl || '';
-        // Only accept links that are http(s) and end with .jpg, .jpeg, .png, .webp and are from trusted sources
-        const isValid = imageUrl &&
-          imageUrl.startsWith('http') &&
-          /\.(jpg|jpeg|png|webp)$/i.test(imageUrl) &&
-          (imageUrl.includes('unsplash.com') || imageUrl.includes('wikimedia.org') || imageUrl.includes('wikipedia.org') || imageUrl.includes(destination.toLowerCase().replace(/\s+/g, '')));
-        if (!isValid) {
-          // Fallback to Unsplash
-          imageUrl = await fetchUnsplashPhoto(`${act.name} ${destination}`);
-        }
-        return {
-          ...act,
-          imageUrl,
-          orderIndex: idx
-        };
+      // Remove imageUrl logic, just map activities as-is
+      const activities = day.activities.map((act: any, idx: number) => ({
+        ...act,
+        orderIndex: idx
       }));
       
       days.push({ dayNumber, date, activities });
@@ -373,4 +358,56 @@ async function fetchUnsplashPhoto(query: string): Promise<string> {
     console.error('Unsplash fetch error', e);
   }
   return '';
+}
+
+// Utility to get lat/lon from OpenWeather Geocoding API
+export async function getLatLonForCity(city: string, apiKey: string): Promise<{ lat: number, lon: number } | null> {
+  const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=1&appid=${apiKey}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (Array.isArray(data) && data.length > 0) {
+    return { lat: data[0].lat, lon: data[0].lon };
+  }
+  return null;
+}
+
+// Utility to get 5-day/3-hour forecast from OpenWeather
+export async function getWeatherForecast(lat: number, lon: number, apiKey: string, units: string = 'metric') {
+  const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=${units}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+// Utility to get weather summary for each day/time of day
+export function getWeatherSummaryForItinerary(
+  itinerary: { days: { date: string }[] },
+  forecast: { list: { dt_txt: string, main: { temp: number }, weather: { description: string, icon: string }[] }[] }
+): Record<string, { morning: any, afternoon: any, evening: any }> {
+  // Map: date string -> { morning, afternoon, evening }
+  const summary: Record<string, { morning: any, afternoon: any, evening: any }> = {};
+  const timeMap = { morning: 9, afternoon: 15, evening: 21 };
+  for (const day of itinerary.days) {
+    const date = day.date;
+    summary[date] = { morning: null, afternoon: null, evening: null };
+    for (const [timeOfDay, hour] of Object.entries(timeMap)) {
+      // Find the forecast closest to this date + hour
+      const target = forecast.list.find((item: any) => {
+        const dt = new Date(item.dt_txt);
+        return dt.getFullYear() === new Date(date).getFullYear() &&
+               dt.getMonth() === new Date(date).getMonth() &&
+               dt.getDate() === new Date(date).getDate() &&
+               dt.getHours() === hour;
+      });
+      if (target) {
+        summary[date][timeOfDay as 'morning' | 'afternoon' | 'evening'] = {
+          temp: target.main.temp,
+          description: target.weather[0].description,
+          icon: target.weather[0].icon,
+        };
+      } else {
+        summary[date][timeOfDay as 'morning' | 'afternoon' | 'evening'] = null;
+      }
+    }
+  }
+  return summary;
 }
