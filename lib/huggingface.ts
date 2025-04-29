@@ -24,7 +24,10 @@ export async function generateOpenRouterItinerary(formData: ItineraryFormData): 
     // Create a detailed prompt for the Mixtral model
     const prompt = `<s>[INST] You are a local travel expert in ${destination} who specializes in highly personalized itineraries.
     
+<<<<<<< HEAD
 Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}.
+=======
+Create a detailed ${duration}-day trip for someone starting on ${startDate} who specifically requested these interests: ${preferences}. 
 
 IMPORTANT: You must respond with a valid JSON object that follows this exact structure:
 {
@@ -45,10 +48,47 @@ IMPORTANT: You must respond with a valid JSON object that follows this exact str
   ]
 }
 
+For each activity, include the following fields:
+- name: The real venue name
+- timeOfDay: Morning, Afternoon, or Evening
+- description: A brief 2-3 sentence description of the activity
+- location: The venue address
+- categories: The type of venue (e.g., museum, park, restaurant)
+>>>>>>> 78da3e2100d71408f3ed947ea63cb1b6d4df2d85
+
+IMPORTANT: You must respond with a valid JSON object that follows this exact structure:
+{
+  "days": [
+    {
+      "day": 1,
+      "date": "${format(startDateObj, "yyyy-MM-dd")}",
+      "activities": [
+        {
+          "name": "Activity Name",
+          "timeOfDay": "Morning/Afternoon/Evening",
+          "description": "2-3 sentence description",
+          "location": "Venue address",
+          "categories": "Type of venue (e.g., museum, park, restaurant)"
+        }
+      ]
+    }
+  ]
+}
+
+<<<<<<< HEAD
 STRICT INSTRUCTIONS:
 - Respond ONLY with the JSON object, no other text, no reasoning, no comments, no markdown.
 - Do NOT include any explanation, reasoning, or text outside the JSON object.
 - If you cannot comply, respond with an empty JSON object: {}.
+=======
+IMPORTANT INSTRUCTIONS:
+1. DIRECTLY MATCH activities to the user's stated interests
+2. Include ONLY real, specific venues and attractions in ${destination}
+3. Activities should be diverse across the trip
+4. BALANCE the day with a mix of preferences
+5. Base your selections ENTIRELY on the given interests
+6. RESPOND ONLY WITH THE JSON OBJECT, NO OTHER TEXT
+>>>>>>> 78da3e2100d71408f3ed947ea63cb1b6d4df2d85
 
 [/INST]</s>`
 
@@ -165,6 +205,7 @@ STRICT INSTRUCTIONS:
     try {
       parsedResponse = JSON.parse(jsonText);
     } catch (err) {
+<<<<<<< HEAD
       console.error("Error parsing OpenRouter JSON string (first attempt):", jsonText);
       // Try to salvage by trimming to the last closing brace
       const lastBrace = jsonText.lastIndexOf('}');
@@ -180,6 +221,10 @@ STRICT INSTRUCTIONS:
       } else {
         throw new Error(`Failed to parse OpenRouter response as JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
+=======
+      console.error("Error parsing OpenRouter JSON string:", jsonText);
+      throw new Error(`Failed to parse OpenRouter response as JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
+>>>>>>> 78da3e2100d71408f3ed947ea63cb1b6d4df2d85
     }
 
     // Validate response structure
@@ -210,7 +255,10 @@ STRICT INSTRUCTIONS:
       const dayNumber = day.day || day.dayNumber || (parsedResponse.days.indexOf(day) + 1);
       const date = day.date || format(addDays(startDateObj, dayNumber - 1), "yyyy-MM-dd");
       
+<<<<<<< HEAD
       // Remove imageUrl logic, just map activities as-is
+=======
+>>>>>>> 78da3e2100d71408f3ed947ea63cb1b6d4df2d85
       const activities = day.activities.map((act: any, idx: number) => ({
         ...act,
         orderIndex: idx
